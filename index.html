@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three.js Black Hole Simulation</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+  // Initialize scene, camera, and renderer
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Add lighting
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const pointLight = new THREE.PointLight(0xffffff, 1);
+  pointLight.position.set(50, 50, 50);
+  scene.add(pointLight);
+
+  // Create Earth
+  const earthLoader = new THREE.GLTFLoader();
+  let earth;
+  let earthSpeed = 0.005; // Initial speed of Earth
+  let scaleReductionFactor = 0.99; // Scale reduction factor
+  let speedReductionFactor = 0.99; // Speed reduction factor
+
+  earthLoader.load(
+    "./earth.glb",
+    function(gltf){
+      earth = gltf.scene;
+      earth.position.x = -10; // Start position of Earth
+      earth.scale.set(0.001,0.001,0.001);
+      scene.add(earth);
+    },
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    // called when loading has errors
+    function (error) {
+      console.log('An error happened');
+    }
+  );
+
+  // Initialize GLTFLoader
+  const loader = new THREE.GLTFLoader();
+  let blackHole;
+
+  // Load the black hole model
+  loader.load(
+    // resource URL
+    "./blackhole.glb",
+    // called when the resource is loaded
+    function (gltf) {
+      blackHole = gltf.scene;
+      scene.add(blackHole);
+    },
+    // called while loading is progressing
+    function (xhr) {
+      console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    // called when loading has errors
+    function (error) {
+      console.log('An error happened');
+    }
+  );
+
+  // Load background image
+  const textureLoader = new THREE.TextureLoader();
+  const backgroundImage = textureLoader.load('./galaxy.jpg');
+  scene.background = backgroundImage;
+
+  // Create particles
+  const particles = [];
+  const particlesCount = 1000;
+  const particleGeometry = new THREE.SphereGeometry(0.01, 5, 5);
+  const particleMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+
+  for (let i = 0; i < particlesCount; i++) {
+    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+    particle.position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
+    scene.add(particle);
+    particles.push(particle);
+  }
+
+  // Position camera
+  camera.position.z = 10;
+
+  // Initialize OrbitControls
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; // Enable damping (inertia)
+  controls.dampingFactor = 0.25; // Damping factor
+  controls.screenSpacePanning = false; // Disable panning in screen space
+  controls.maxPolarAngle = Math.PI / 2; // Limit vertical rotation
+
+  // Animation function
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Update controls
+    controls.update();
+
+    // Move the Earth towards the black hole
+    if (earth && earth.position.x < 0) {
+      earth.position.x += earthSpeed;
+      // Apply spaghettification effect when earth.position.x > -0.2
+      if (earth.position.x > -0.2) {
+        // Stretch the Earth along the y-axis
+        earth.scale.y *= scaleReductionFactor; // Adjust scale reduction factor as needed
+        // Stretch the Earth along the z-axis
+        earth.scale.z *= scaleReductionFactor; // Adjust scale reduction factor as needed
+        // Slow down Earth's speed
+        earthSpeed *= speedReductionFactor; // Adjust speed reduction factor as needed
+      }
+    }
+    if (blackHole) {
+      blackHole.rotation.y += .01;
+    }
+    if (earth) {
+      earth.rotation.y += .01;
+    }
+
+    // Animate particles towards the black hole
+    for (const particle of particles) {
+      const dx = blackHole.position.x - particle.position.x;
+      const dy = blackHole.position.y - particle.position.y;
+      const dz = blackHole.position.z - particle.position.z;
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      // Move particle towards the black hole
+      particle.position.x += dx / distance * 0.02;
+      particle.position.y += dy / distance * 0.02;
+      particle.position.z += dz / distance * 0.02;
+
+      // Reset particle position when it gets too close to the black hole
+      if (distance < 0.5) {
+        particle.position.set((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+</script>
+</body>
+</html>
